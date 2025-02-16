@@ -5,14 +5,18 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'
 
 
 import asyncio
-from app.infrastructure.object_recognition import calculate_video_hash, recognize_objects_on_video, save_video_in_db
+from app.domain.object_recognition import calculate_video_hash, recognize_objects_on_video, save_video_in_db
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from app.api.views import create_video
 from app.models.object import Object
 from app.models.video import Video
-from database import SessionLocal
+from app.infrastructure.database import SessionLocal
 from datetime import datetime
+
+
+
+
 
 # Токен, полученный от BotFather
 API_TOKEN = "8029380554:AAHeZmmWtbpfioHQ6yEFeTP2ZjkDbX1Y4Iw"

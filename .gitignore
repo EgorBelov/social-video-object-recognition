@@ -170,3 +170,4 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 yolov4.weights
+tokens.txt

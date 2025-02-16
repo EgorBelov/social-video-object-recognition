@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: video-object-recognition
+    ports:
+      - "8000:8000"  # Прокидываем порт для доступа к API
+    volumes:
+      - .:/app  # Подключаем текущую папку для удобства разработки
+    environment:
+      - DATABASE_URL=postgresql://postgres:123321@db/svor  # Ссылка на базу данных
+    depends_on:
+      - db  # Зависимость от контейнера базы данных
+    networks:
+      - app-network
+
+  db:
+    image: postgres:13  # Официальный образ PostgreSQL
+    container_name: video-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123321
+      POSTGRES_DB: svor
+    ports:
+      - "5432:5432"  
+    volumes:
+      - pgdata:/var/lib/postgresql/data  # Сохраняем данные базы данных
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  pgdata:
