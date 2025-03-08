@@ -21,9 +21,9 @@ def calculate_video_hash(video_path):
 
 
 # Путь к файлам модели YOLO
-yolo_cfg = "yolo_model/yolov4.cfg"
-yolo_weights = "yolo_model/yolov4.weights"
-yolo_names = "yolo_model/coco.names"
+yolo_cfg = "E:\HSE_HERNYA\python_4_course\EgorBelov-social-video-object-recognition\yolo_model\yolov4.cfg"
+yolo_weights = "E:\HSE_HERNYA\python_4_course\EgorBelov-social-video-object-recognition\yolo_model\yolov4.weights"
+yolo_names = "E:\HSE_HERNYA\python_4_course\EgorBelov-social-video-object-recognition\yolo_model\coco.names"
 
 # Загрузка сети YOLO
 net = cv2.dnn.readNetFromDarknet(yolo_cfg, yolo_weights)

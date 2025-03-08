@@ -1,8 +1,11 @@
 import cv2
 import sys
+
+from dotenv import load_dotenv
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
+load_dotenv()
 
 import asyncio
 from app.domain.object_recognition import calculate_video_hash, recognize_objects_on_video, save_video_in_db
@@ -16,10 +19,8 @@ from datetime import datetime
 
 
 
+API_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 
-
-# Токен, полученный от BotFather
-API_TOKEN = "8029380554:AAHeZmmWtbpfioHQ6yEFeTP2ZjkDbX1Y4Iw"
 
 # Создаем объект Application
 application = Application.builder().token(API_TOKEN).build()
@@ -27,10 +28,6 @@ application = Application.builder().token(API_TOKEN).build()
 # Функция для обработки команды /start
 async def start(update: Update, context):
     await update.message.reply_text("Привет! Я могу помочь найти видео с распознанными объектами. Отправь мне видео.")
-
-
-
-
 
 
 def check_video_integrity(processed_video_path):

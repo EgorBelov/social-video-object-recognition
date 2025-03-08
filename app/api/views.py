@@ -25,7 +25,7 @@ async def create_video(title: str, description: str, url: str, platform: str, db
     return db_video
 
 @router.get("/videos/{video_id}")
-def read_video(video_id: int, db: Session = Depends(get_db)):
+async def read_video(video_id: int, db: Session = Depends(get_db)):
     db_video = db.query(Video).filter(Video.id == video_id).first()
     return db_video
 

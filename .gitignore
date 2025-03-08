@@ -171,3 +171,7 @@ cython_debug/
 .pypirc
 yolov4.weights
 tokens.txt
+.env
+trash/
+videos/
+processed_videos/
