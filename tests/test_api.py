@@ -4,7 +4,7 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../app')))
 
-import app.main as main
+import api_service.app.main as main
 
 client = TestClient(main)
 
