@@ -77,3 +77,27 @@ services:
 
 volumes:
   pgdata:
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          pip install flake8
+          # или если у вас есть requirements, pip install -r requirements.txt
+
+      - name: Lint (flake8)
+        run: |
+          flake8 api_service/ worker_service/ bot_service/
+
+      - name: Static analysis (mypy)
+        run: mypy api_service/ worker_service/ bot_service/
