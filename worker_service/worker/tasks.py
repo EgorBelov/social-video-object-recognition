@@ -8,7 +8,7 @@ from infrastructure.database import SessionLocal
 from models.video import Video
 from models.object import Object
 from datetime import datetime
-#from common.celery_app import celery_app
+# from common.celery_app import celery_app
 
 
 def calculate_video_hash(video_path):
@@ -19,8 +19,6 @@ def calculate_video_hash(video_path):
             sha256_hash.update(byte_block)
     print(f"Video hash: {sha256_hash.hexdigest()}")  # Логирование хэша
     return sha256_hash.hexdigest()
-
-
 
 # Путь к файлам модели YOLO
 # yolo_cfg = r"E:\HSE_HERNYA\python_4_course\EgorBelov-social-video-object-recognition\yolo_model\yolov4.cfg"
@@ -61,14 +59,14 @@ with open(yolo_names, "r") as f:
     classes = [line.strip() for line in f.readlines()]
 
 
-#celery_app = Celery("worker", broker="amqp://guest:guest@localhost:5672//")  # или ваш RabbitMQ DSN
+# celery_app = Celery("worker", broker="amqp://guest:guest@localhost:5672//")  # или ваш RabbitMQ DSN
 celery_app = Celery("worker", broker="amqp://guest:guest@rabbitmq:5672//")
 
 
 @celery_app.task(name="tasks.recognize_objects_on_video")
 def recognize_objects_on_video(video_id):
-    
-    #api_url = "http://127.0.0.1:8000"
+
+    # api_url = "http://127.0.0.1:8000"
     api_url = "http://api:8000"
 
     resp = requests.get(f"{api_url}/videos/{video_id}")
@@ -81,9 +79,9 @@ def recognize_objects_on_video(video_id):
     if not video_path:
         print(f"В данных видео (id={video_id}) отсутствует поле url.")
         return
-    
+
     # Открываем видео
-    #cap = cv2.VideoCapture("../../" + video_path)
+    # cap = cv2.VideoCapture("../../" + video_path)
     # Получаем PROJECT_ROOT, например, /app
     PROJECT_ROOT = os.getenv("PROJECT_ROOT", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
     # Если API сохраняет видео с путём "videos/xxx.mp4", то формируем абсолютный путь:
@@ -104,15 +102,11 @@ def recognize_objects_on_video(video_id):
         cap.release()
         return
 
-    
-
-        
     # Создаем директорию для сохранения обработанного видео
     # output_path = video_path.replace("videos/", "../../processed_videos/")
     # output_dir = os.path.dirname(output_path)
     # os.makedirs(output_dir, exist_ok=True)
-    
-    
+
     PROCESSED_DIR = os.path.join(PROJECT_ROOT, "processed_videos")
     os.makedirs(PROCESSED_DIR, exist_ok=True)
     # Заменяем часть пути:
@@ -120,7 +114,7 @@ def recognize_objects_on_video(video_id):
     print("Путь к обработанному видео:", processed_path)
     # Создаем объект VideoWriter
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Кодек для MP4
-    #video_writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+    # video_writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
     video_writer = cv2.VideoWriter(processed_path, fourcc, fps, (width, height))
     if not video_writer.isOpened():
         print("Ошибка создания VideoWriter")
@@ -165,7 +159,7 @@ def recognize_objects_on_video(video_id):
 
                     if label not in recognized_labels:
                         recognized_labels.append(label)
-                    
+
                     # Проверка на наличие объекта в базе данных
                     existing_object = db.query(Object).filter(
                         Object.video_id == video_id,
@@ -200,10 +194,10 @@ def recognize_objects_on_video(video_id):
         # Записываем обработанный кадр
         if video_writer.isOpened():
             video_writer.write(frame)
-    
+
     # Сохраняем все изменения в базе данных
     db.commit()
-    
+
     # Освобождаем ресурсы
     cap.release()
     if video_writer.isOpened():
@@ -213,18 +207,16 @@ def recognize_objects_on_video(video_id):
     return recognized_labels
 
 
-
-
 # def save_video_in_db(video_path, title, description):
-    
+
 #     # Проверка на наличие уже загруженного видео
 #     video_hash = calculate_video_hash(video_path)
-    
+
 #     db = SessionLocal()
 
 #     # Ищем видео с таким же хэшем в базе данных
 #     existing_video = db.query(Video).filter(Video.hash == video_hash).first()
-    
+
 #     if existing_video:
 #         # Если видео с таким хэшем уже есть, возвращаем его id и флаг, что видео уже есть
 #         db.close()
