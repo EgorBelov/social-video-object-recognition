@@ -22,7 +22,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install flake8
+          pip install flake8 mypy
+
           # или если у вас есть requirements, pip install -r requirements.txt
 
       - name: Lint (flake8)
