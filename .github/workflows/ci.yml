@@ -24,7 +24,10 @@ jobs:
         run: |
           pip install flake8 mypy types-requests pytest requests
 
-      
+      - name: Install docker-compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose
 
       - name: Lint (flake8)
         run: |
