@@ -1,31 +1,52 @@
 import hashlib
 import os
 import asyncio
+from typing import Union
 import httpx
 from dotenv import load_dotenv
-from telegram import Update
+from telegram import Document, Update, Video
 from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
     filters,
 )
+import logging
+from graypy import GELFUDPHandler
+
 
 load_dotenv()
 
-API_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
+API_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8029380554:AAHeZmmWtbpfioHQ6yEFeTP2ZjkDbX1Y4Iw")
+API_URL = os.getenv("API_URL", "")
 
 # Создаем асинхронное приложение телеграм-бота
 application = Application.builder().token(API_TOKEN).build()
 
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+GRAYLOG_HOST = os.getenv("GRAYLOG_HOST", "graylog")  # имя сервиса в docker-compose
+GRAYLOG_PORT = 12201  # По умолчанию GELF UDP
+
+handler = GELFUDPHandler(GRAYLOG_HOST, GRAYLOG_PORT)
+logger.addHandler(handler)
+
+logger.info("Hello from Python service without Elasticsearch!")
+
+
 # Команда /start
 async def start(update: Update, context):
+
+    logger.info("User invoked /start")
+    if update.message is None:
+        return  # или raise или что-то, если ситуация невозможна
     await update.message.reply_text(
         "Привет! Я могу помочь найти видео с распознанными объектами.\n"
         "Отправь мне видео, чтобы я мог добавить его в систему, "
         "или введи /search <object>, чтобы найти готовые видео."
     )
+
 
 # Обработка видео (MessageHandler)
 async def handle_video(update: Update, context):
@@ -35,17 +56,24 @@ async def handle_video(update: Update, context):
     3) Дернуть API: POST /videos/{video_id}/process -> поставит задачу воркеру
     4) Сказать пользователю, что идёт обработка.
     """
-    if update.message.video:
-        video_file = update.message.video
-    elif update.message.document and update.message.document.mime_type.startswith('video/'):
-        video_file = update.message.document
+    # Сначала сохраняем сообщение в локальную переменную
+    message = update.message
+    if message is None:
+        return
+
+    # Определяем переменную video_file как объединение типов Video и Document
+    video_file: Union[Video, Document]
+
+    if message.video is not None:
+        video_file = message.video
+    elif message.document is not None and message.document.mime_type is not None and message.document.mime_type.startswith('video/'):
+        video_file = message.document
     else:
-        await update.message.reply_text("Пожалуйста, отправьте видеофайл!")
+        await message.reply_text("Пожалуйста, отправьте видеофайл!")
         return
 
     file = await video_file.get_file()
-    
-    
+
     # os.makedirs("videos", exist_ok=True)
     # local_video_path = f"videos/{video_file.file_id}.mp4"
     # await file.download_to_drive(local_video_path)
@@ -57,15 +85,16 @@ async def handle_video(update: Update, context):
 
     local_video_path = os.path.join(VIDEOS_DIR, f"{video_file.file_id}.mp4")
     await file.download_to_drive(local_video_path)
-    
+    if update.message is None:
+        return  # или raise или что-то, если ситуация невозможна
     await update.message.reply_text("Видео получено, создаю запись в системе...")
-    
+
     sha256_hash = hashlib.sha256()
     with open(local_video_path, "rb") as f:
         for byte_block in iter(lambda: f.read(4096), b""):
             sha256_hash.update(byte_block)
     print(f"Video hash: {sha256_hash.hexdigest()}")  # Логирование хэша
-    
+
     # Создаём запись о видео (асинхронно вызываем API)
     payload = {
         "title": f"TGVideo_{video_file.file_id}",
@@ -73,16 +102,18 @@ async def handle_video(update: Update, context):
         "url": local_video_path,     # Путь, который Worker потом найдёт
         "platform": "Telegram"
     }
-    print (payload)
+    print(payload)
     try:
         async with httpx.AsyncClient() as client:
-            #resp = await client.post(f"{API_URL}/videos/", json=payload)
+            # resp = await client.post(f"{API_URL}/videos/", json=payload)
             resp = await client.post(
                 f"{API_URL}/videos/?title={payload['title']}&description={payload['description']}&url={payload['url']}&platform=Telegram&hash={sha256_hash.hexdigest()}")
             resp.raise_for_status()
             video_data = resp.json()  # Предположим, {"id":123,"title":"...","...":...}
             video_id = video_data["id"]
     except httpx.HTTPError as e:
+        if update.message is None:
+            return  # или raise или что-то, если ситуация невозможна
         await update.message.reply_text(f"Ошибка при создании записи о видео: {e}")
         return
 
@@ -96,13 +127,17 @@ async def handle_video(update: Update, context):
             resp_process = await client.post(f"{API_URL}/videos/{video_id}/process")
             resp_process.raise_for_status()
     except httpx.HTTPError as e:
+        if update.message is None:
+            return  # или raise или что-то, если ситуация невозможна
         await update.message.reply_text(f"Ошибка при постановке задачи в очередь: {e}")
         return
-
+    if update.message is None:
+        return  # или raise или что-то, если ситуация невозможна
     await update.message.reply_text(
         "Задача на обработку отправлена! "
         "Подождите, пока воркер обработает видео."
     )
+
 
 # Команда /search
 async def search_videos(update: Update, context):
@@ -113,6 +148,8 @@ async def search_videos(update: Update, context):
     """
     query = ' '.join(context.args)
     if not query:
+        if update.message is None:
+            return  # или raise или что-то, если ситуация невозможна
         await update.message.reply_text("Пожалуйста, введите запрос для поиска. Пример: /search car")
         return
 
@@ -124,15 +161,21 @@ async def search_videos(update: Update, context):
                 timeout=30.0
             )
             if resp.status_code == 404:
+                if update.message is None:
+                    return  # или raise или что-то, если ситуация невозможна
                 await update.message.reply_text(f"По запросу '{query}' ничего не найдено.")
                 return
             resp.raise_for_status()
             results = resp.json()  # Предположим, список видео
     except httpx.HTTPError as e:
+        if update.message is None:
+            return  # или raise или что-то, если ситуация невозможна
         await update.message.reply_text(f"Ошибка при запросе к API: {e}")
         return
 
     if not results:
+        if update.message is None:
+            return  # или raise или что-то, если ситуация невозможна
         await update.message.reply_text(f"По запросу '{query}' ничего не найдено.")
         return
 
@@ -148,7 +191,7 @@ async def search_videos(update: Update, context):
     #     ]
     #   }, ...
     # ]
-     # Получаем PROJECT_ROOT из переменной окружения
+    # Получаем PROJECT_ROOT из переменной окружения
     PROJECT_ROOT = os.getenv("PROJECT_ROOT", os.getcwd())
     for video_item in results:
         title = video_item["title"]
@@ -157,8 +200,10 @@ async def search_videos(update: Update, context):
         obj_str = ", ".join([f"{o['label']}({o['count']})" for o in objs]) if objs else "нет объектов"
 
         message_text = f"Нашёл видео: {title}\nОбъекты: {obj_str}"
+        if update.message is None:
+            return  # или raise или что-то, если ситуация невозможна
         await update.message.reply_text(message_text)
-         # Строим абсолютный путь к исходному видео
+        # Строим абсолютный путь к исходному видео
         abs_video_path = os.path.join(PROJECT_ROOT, url)
         # Формируем путь к обработанному файлу, заменяя "videos" на "processed_videos"
         abs_processed_path = abs_video_path.replace(os.path.join(PROJECT_ROOT, "videos"), os.path.join(PROJECT_ROOT, "processed_videos"))
@@ -166,8 +211,12 @@ async def search_videos(update: Update, context):
         if os.path.exists(abs_processed_path):
             try:
                 with open(abs_processed_path, 'rb') as vid_file:
+                    if update.message is None:
+                        return  # или raise или что-то, если ситуация невозможна
                     await update.message.reply_video(video=vid_file)
             except Exception as e:
+                if update.message is None:
+                    return  # или raise или что-то, если ситуация невозможна
                 await update.message.reply_text(f"Ошибка при отправке видео: {e}")
         else:
             await update.message.reply_text(
@@ -188,6 +237,7 @@ async def search_videos(update: Update, context):
         #         "Возможно, обработка ещё не завершена."
         #     )
 
+
 # ----- команда /status <video_id> -----
 async def status_video(update: Update, context):
     """
@@ -196,11 +246,14 @@ async def status_video(update: Update, context):
     Если запись существует и обработанное видео доступно, отправляет его.
     """
     if not context.args:
+        if update.message is None:
+            return  # или raise или что-то, если ситуация невозможна
         await update.message.reply_text("Пожалуйста, укажите ID видео. Пример: /status 12")
         return
-    
     video_id = context.args[0]
     if not video_id.isdigit():
+        if update.message is None:
+            return  # или raise или что-то, если ситуация невозможна
         await update.message.reply_text("ID видео должно быть числом. Пример: /status 12")
         return
 
@@ -211,15 +264,22 @@ async def status_video(update: Update, context):
             resp.raise_for_status()
             data = resp.json()  # например, {"id":123,"title":"...","url":"videos/xxx.mp4","hash":"abcd1234", ...}
     except httpx.HTTPError as e:
-        if e.response and e.response.status_code == 404:
-            await update.message.reply_text(f"Видео с ID={video_id} не найдено.")
+        if hasattr(e, 'response'):
+            if e.response and e.response.status_code == 404:
+                if update.message is None:
+                    return  # или raise или что-то, если ситуация невозможна
+                await update.message.reply_text(f"Видео с ID={video_id} не найдено.")
+                return
+            if update.message is None:
+                return  # или raise или что-то, если ситуация невозможна
+            await update.message.reply_text(f"Ошибка при запросе статуса видео: {str(e)}")
             return
-        await update.message.reply_text(f"Ошибка при запросе статуса видео: {str(e)}")
-        return
 
-    # Проверяем, есть ли у нас локально processed_videos/... 
+    # Проверяем, есть ли у нас локально processed_videos/...
     video_path = data.get("url")
     if not video_path:
+        if update.message is None:
+            return  # или raise или что-то, если ситуация невозможна
         await update.message.reply_text("У видео нет поля url, не могу найти файл.")
         return
     PROJECT_ROOT = os.getenv("PROJECT_ROOT", os.getcwd())
@@ -229,10 +289,16 @@ async def status_video(update: Update, context):
     if os.path.exists(abs_processed_path):
         try:
             with open(abs_processed_path, 'rb') as vid_file:
+                if update.message is None:
+                    return  # или raise или что-то, если ситуация невозможна
                 await update.message.reply_video(video=vid_file)
         except Exception as e:
+            if update.message is None:
+                return  # или raise или что-то, если ситуация невозможна
             await update.message.reply_text(f"Ошибка при отправке файла: {e}")
     else:
+        if update.message is None:
+            return  # или raise или что-то, если ситуация невозможна
         await update.message.reply_text(
             "Обработанное видео не найдено. Возможно, обработка ещё не завершена или видео не существует."
         )
@@ -255,13 +321,13 @@ async def status_video(update: Update, context):
     #     )
 
 
-
 # Регистрируем команды и хендлеры
 application.add_handler(CommandHandler('start', start))
 application.add_handler(CommandHandler('search', search_videos))
 application.add_handler(CommandHandler("status", status_video))
 # Принимаем только видеофайлы
 application.add_handler(MessageHandler(filters.VIDEO | filters.Document.VIDEO, handle_video))
+
 
 # Запуск бота
 if __name__ == "__main__":

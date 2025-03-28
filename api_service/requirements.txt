@@ -14,3 +14,9 @@ requests==2.28.2
 
 # Celery
 celery==5.4.0
+
+flake8==6.0.0
+
+mypy==1.1.1
+
+graypy==2.1.0

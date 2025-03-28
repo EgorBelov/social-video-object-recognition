@@ -1,12 +1,12 @@
 version: '3.9'
 services:
-  api:
+  api1:
     build:
       context: ./api_service
       dockerfile: Dockerfile
-    container_name: api_service
-    ports:
-      - "8000:8000"
+    container_name: api1
+    expose:
+      - "8000"
     depends_on:
       - db
       - rabbitmq
@@ -16,9 +16,47 @@ services:
     #   - API_URL=http://api:8000
     #   - PROJECT_ROOT=/app
     env_file: .env
+    environment:
+      - INST_NAME=api1_instance
     volumes:
       - ./videos:/app/videos
       - ./processed_videos:/app/processed_videos
+    
+
+  api2:
+      build:
+        context: ./api_service
+        dockerfile: Dockerfile
+      container_name: api2
+      expose:
+        - "8000"
+      depends_on:
+        - db
+        - rabbitmq
+      # environment:
+      #   - DATABASE_URL=postgresql://postgres:123321@db/svor
+      #   - RABBITMQ_HOST=rabbitmq
+      #   - API_URL=http://api:8000
+      #   - PROJECT_ROOT=/app
+      env_file: .env
+      environment:
+        - INST_NAME=api2_instance
+      volumes:
+        - ./videos:/app/videos
+        - ./processed_videos:/app/processed_videos
+      
+
+  lb:
+    image: nginx:alpine
+    container_name: nginx_load_balancer
+    depends_on:
+      - api1
+      - api2
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "80:80"
+    
 
   worker:
     build:
@@ -37,6 +75,7 @@ services:
       - ./videos:/app/videos
       - ./processed_videos:/app/processed_videos
       - ./yolo_model:/app/yolo_model
+    
 
   bot:
     build:
@@ -44,8 +83,10 @@ services:
       dockerfile: Dockerfile
     container_name: bot_service
     depends_on:
-      - api
+      - api1
+      - api2
       - rabbitmq
+      - graylog
     # environment:
     #   - TELEGRAM_BOT_TOKEN=8029380554:AAHeZmmWtbpfioHQ6yEFeTP2ZjkDbX1Y4Iw
     #   - API_URL=http://api:8000
@@ -54,6 +95,7 @@ services:
     volumes:
       - ./videos:/app/videos
       - ./processed_videos:/app/processed_videos
+   
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -61,6 +103,7 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+    
 
   db:
     image: postgres:14
@@ -74,6 +117,64 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    
+  mongodb:
+    image: mongo:6
+    container_name: mongodb_container
+    # Можно пробросить порт, но обычно не нужно
+    # ports:
+    #   - "27017:27017"
+
+    # ===== OPENSEARCH =====
+  elasticsearch:
+    image: opensearchproject/opensearch:2.6.0
+    container_name: opensearch_container
+    environment:
+      - discovery.type=single-node
+      - plugins.security.disabled=true
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - "9200:9200"  # хотите ли вы наружу этот порт?
+      - "9600:9600"
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+
+  # ===== GRAYLOG =====
+  graylog:
+    image: graylog/graylog:5.1
+    container_name: graylog_container
+    depends_on:
+      - mongodb
+      - elasticsearch
+    environment:
+      # Основные настройки
+      - GRAYLOG_ROOT_PASSWORD_SHA2=96cae35ce8a9b0244178bf28e4966c2ce1b8385723a96a6b838858cdd6ca0a1e
+      - GRAYLOG_PASSWORD_SECRET=SomeRandomVeryLongSecret
+      - GRAYLOG_HTTP_EXTERNAL_URI=http://localhost:9000/
+
+      # Подключаем OpenSearch
+      # - GRAYLOG_OPENSEARCH_HOSTS=http://localhost:9200
+      - GRAYLOG_OPENSEARCH_HOSTS=http://opensearch:9200
+      - GRAYLOG_OPENSEARCH_ENABLED=true
+      - GRAYLOG_STORAGE_OPENSEARCH_ENABLED=true
+      # В последних версиях Graylog 5:
+      # GRAYLOG_OPENSEARCH_HOSTS заменяет GRAYLOG_ELASTICSEARCH_HOSTS
+      # иногда нужно GRAYLOG_ELASTICSEARCH_VERSION=7 или 8, но OpenSearch 2.x обычно определяется автоматически
+
+      # Подключение Mongo
+      - GRAYLOG_MONGODB_URI=mongodb://mongodb:27017/graylog
+
+    ports:
+      - "9000:9000"       # веб-интерфейс Graylog
+      - "12201:12201/udp" # GELF UDP
+      - "12201:12201/tcp" # GELF TCP
+      
 
 volumes:
   pgdata:
+  opensearch_data:
+

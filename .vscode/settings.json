@@ -1,5 +1,7 @@
 {
     "python.analysis.extraPaths": [
-        "./app/infrastructure"
+        "./app/infrastructure",
+        "./tests/unit/test_",
+        "./worker_service/worker"
     ]
 }
