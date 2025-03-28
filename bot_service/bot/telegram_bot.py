@@ -11,18 +11,34 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
+import logging
+from graypy import GELFUDPHandler
+
 
 load_dotenv()
 
-API_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
+API_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8029380554:AAHeZmmWtbpfioHQ6yEFeTP2ZjkDbX1Y4Iw")
+API_URL = os.getenv("API_URL", "")
 
 # Создаем асинхронное приложение телеграм-бота
 application = Application.builder().token(API_TOKEN).build()
 
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+GRAYLOG_HOST = os.getenv("GRAYLOG_HOST", "graylog")  # имя сервиса в docker-compose
+GRAYLOG_PORT = 12201  # По умолчанию GELF UDP
+
+handler = GELFUDPHandler(GRAYLOG_HOST, GRAYLOG_PORT)
+logger.addHandler(handler)
+
+logger.info("Hello from Python service without Elasticsearch!")
+
 
 # Команда /start
 async def start(update: Update, context):
+
+    logger.info("User invoked /start")
     if update.message is None:
         return  # или raise или что-то, если ситуация невозможна
     await update.message.reply_text(

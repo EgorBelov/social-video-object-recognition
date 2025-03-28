@@ -2,6 +2,7 @@ import hashlib
 import os
 from celery import Celery
 import cv2
+from dotenv import load_dotenv
 import numpy as np
 import requests
 from infrastructure.database import SessionLocal
@@ -9,6 +10,7 @@ from models.video import Video
 from models.object import Object
 from datetime import datetime
 # from common.celery_app import celery_app
+load_dotenv()
 
 
 def calculate_video_hash(video_path):
@@ -67,7 +69,7 @@ celery_app = Celery("worker", broker="amqp://guest:guest@rabbitmq:5672//")
 def recognize_objects_on_video(video_id):
 
     # api_url = "http://127.0.0.1:8000"
-    api_url = "http://api:8000"
+    api_url = os.getenv("API_URL", "")
 
     resp = requests.get(f"{api_url}/videos/{video_id}")
     if resp.status_code != 200:
