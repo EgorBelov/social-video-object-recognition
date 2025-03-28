@@ -22,7 +22,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install flake8 mypy types-requests
+          pip install flake8 mypy types-requests pytest
 
           # или если у вас есть requirements, pip install -r requirements.txt
 
