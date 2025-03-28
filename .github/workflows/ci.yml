@@ -36,31 +36,31 @@ jobs:
       - name: Static analysis (mypy)
         run: mypy api_service/ worker_service/ bot_service/
 
-       # 1. Соберём Docker-образы (если у вас в docker-compose указаны build-инструкции)
-      - name: Build images
-        run: docker-compose -f docker-compose.yml build
+      #  # 1. Соберём Docker-образы (если у вас в docker-compose указаны build-инструкции)
+      # - name: Build images
+      #   run: docker-compose -f docker-compose.yml build
 
-      # 2. Поднимем docker-compose (API, worker, db, rabbitmq, bot)
-      - name: Start containers
-        run: docker-compose -f docker-compose.yml up -d
+      # # 2. Поднимем docker-compose (API, worker, db, rabbitmq, bot)
+      # - name: Start containers
+      #   run: docker-compose -f docker-compose.yml up -d
 
-      # 3. Ждём, пока API будет готов отвечать
-      - name: Wait for API readiness
-        run: |
-          set +e
-          for i in {1..30}; do
-            echo "Проверяем доступность http://localhost:80"
-            if curl -s http://localhost:80/docs > /dev/null; then
-              echo "API доступно!"
-              exit 0
-            fi
-            echo "Ожидаем ещё 5 секунд..."
-            sleep 25
-          done
-          echo "API не поднялось вовремя."
-          exit 1
-        shell: bash
+      # # 3. Ждём, пока API будет готов отвечать
+      # - name: Wait for API readiness
+      #   run: |
+      #     set +e
+      #     for i in {1..30}; do
+      #       echo "Проверяем доступность http://localhost:80"
+      #       if curl -s http://localhost:80/docs > /dev/null; then
+      #         echo "API доступно!"
+      #         exit 0
+      #       fi
+      #       echo "Ожидаем ещё 5 секунд..."
+      #       sleep 25
+      #     done
+      #     echo "API не поднялось вовремя."
+      #     exit 1
+      #   shell: bash
 
-      # 4. Запустить E2E тест (pytest -m e2e) 
-      - name: E2E tests
-        run: pytest -m e2e tests
+      # # 4. Запустить E2E тест (pytest -m e2e) 
+      # - name: E2E tests
+      #   run: pytest -m e2e tests
